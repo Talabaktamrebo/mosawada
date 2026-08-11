@@ -95,6 +95,7 @@ async function doLogin() {
   const pass = document.getElementById('loginPass').value;
   const btn = document.getElementById('loginBtn');
   loginError('');
+  if (!auth) { loginError('إعدادات Firebase ناقصة — راجع ملف firebase-config.js'); return; }
   if (!email || !pass) { loginError('املأ البريد وكلمة السر'); return; }
 
   btn.disabled = true; btn.textContent = 'جارٍ الدخول…';
