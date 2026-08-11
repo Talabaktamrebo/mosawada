@@ -33,6 +33,71 @@ button{cursor:pointer;border:none;background:none;color:inherit}
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-thumb{background:var(--s300);border-radius:3px}
 
+/* ===== شاشة تسجيل الدخول ===== */
+body.locked{overflow:hidden}
+.login-screen{
+  position:fixed;inset:0;z-index:9999;
+  display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto;
+  background:linear-gradient(135deg,#F6921E 0%,#E07D0A 50%,#d4660a 100%);
+}
+.login-screen[hidden]{display:none}
+.login-bg{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.login-bg span{position:absolute;border-radius:50%;background:rgba(255,255,255,.06)}
+.login-bg span:nth-child(1){top:-120px;right:-120px;width:400px;height:400px}
+.login-bg span:nth-child(2){bottom:-80px;left:-80px;width:320px;height:320px;background:rgba(255,255,255,.05)}
+.login-bg span:nth-child(3){top:40%;left:10%;width:180px;height:180px;background:rgba(255,255,255,.04)}
+
+.login-card{
+  position:relative;margin:auto;width:100%;max-width:420px;
+  background:#fff;border-radius:28px;padding:44px 36px;text-align:center;
+  box-shadow:0 32px 80px rgba(0,0,0,.25);
+  animation:loginIn .45s cubic-bezier(.25,.8,.25,1);
+}
+@keyframes loginIn{from{opacity:0;transform:translateY(24px) scale(.97)}to{opacity:1;transform:none}}
+.login-logo{height:58px;width:auto;max-width:260px;margin:0 auto;display:block;object-fit:contain}
+.login-tag{margin-top:10px;margin-bottom:24px;font-size:12.5px;font-weight:700;color:var(--s400)}
+
+.login-field{text-align:right;margin-bottom:16px}
+.login-field label{display:block;font-size:12px;font-weight:800;color:var(--s600);margin-bottom:7px}
+.login-input-wrap{position:relative}
+.login-input-wrap input{
+  width:100%;padding:14px 16px 14px 46px;
+  border:2px solid var(--s200);border-radius:14px;background:var(--s50);
+  font-size:14px;font-family:inherit;font-weight:600;color:var(--s900);
+  outline:none;transition:border-color .18s,box-shadow .18s,background .18s;
+  direction:ltr;text-align:left;
+}
+.login-input-wrap input::placeholder{color:var(--s400);font-weight:500}
+.login-input-wrap input:focus{border-color:var(--primary);background:#fff;box-shadow:0 0 0 4px rgba(246,146,30,.12)}
+.login-input-wrap svg{
+  position:absolute;left:15px;top:50%;transform:translateY(-50%);
+  width:18px;height:18px;color:var(--s400);pointer-events:none;transition:color .18s;
+}
+.login-input-wrap input:focus + svg{color:var(--primary)}
+
+.login-error{
+  background:var(--rose-lt);color:var(--rose);border:1px solid rgba(220,38,38,.16);
+  padding:11px 14px;border-radius:11px;font-size:13px;font-weight:700;margin-bottom:16px;
+}
+.login-error[hidden]{display:none}
+
+.login-btn{
+  width:100%;padding:15px;border-radius:14px;
+  background:var(--primary);color:#fff;font-size:16px;font-weight:800;
+  box-shadow:0 6px 20px rgba(246,146,30,.4);
+  transition:background .18s,transform .1s,box-shadow .18s;
+  -webkit-tap-highlight-color:transparent;
+}
+.login-btn:hover:not(:disabled){background:var(--primary-dk);box-shadow:0 8px 24px rgba(246,146,30,.5)}
+.login-btn:active:not(:disabled){transform:scale(.975)}
+.login-btn:disabled{opacity:.65;box-shadow:none}
+.login-foot{margin-top:22px;font-size:11px;color:var(--s400);font-weight:600}
+
+@media (max-width:520px){
+  .login-card{padding:34px 24px;border-radius:24px}
+  .login-logo{height:50px}
+}
+
 /* ===== الشريط العلوي — منحني الأطراف السفلية ===== */
 .topbar{
   position:sticky; top:0; z-index:40;
@@ -63,6 +128,17 @@ button{cursor:pointer;border:none;background:none;color:inherit}
   background:var(--rose);color:#fff;font-size:9.5px;font-weight:900;font-style:normal;
   line-height:17px;text-align:center;border:2px solid var(--primary);
 }
+
+/* زر تسجيل الخروج */
+.header-logout{
+  flex:none;width:34px;height:34px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.18);color:#fff;
+  border:1px solid rgba(255,255,255,.3);transition:background .15s,transform .1s;
+}
+.header-logout[hidden]{display:none}
+.header-logout:active{transform:scale(.92);background:rgba(255,255,255,.3)}
+.header-logout svg{width:17px;height:17px}
 
 /* ===== الحاوية العامة ===== */
 .view{padding:16px;max-width:760px;margin:0 auto}

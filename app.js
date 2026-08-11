@@ -48,18 +48,73 @@ let currentCatId = 'apt-rent';
 const LOCAL_KEY = 'tt-drafts-v1';
 
 /* ===== تهيئة Firebase (اختياري) ===== */
+let auth = null;
+
 function initFirebase() {
   const cfg = window.FIREBASE_CONFIG || {};
   if (!cfg.apiKey || !cfg.projectId) { useCloud = false; return; }
   try {
     firebase.initializeApp(cfg);
     db = firebase.firestore();
+    auth = firebase.auth();
     useCloud = true;
   } catch (e) {
     console.warn('Firebase init failed, falling back to local storage', e);
     useCloud = false;
   }
 }
+
+/* ===== تسجيل الدخول =====
+   بدون Firebase: التطبيق يعمل محلياً على الجهاز ولا يطلب دخولاً.
+   مع Firebase: لا يُفتح التطبيق إلا بحساب موظف صالح. */
+function showLogin(show) {
+  document.getElementById('loginScreen').hidden = !show;
+  document.getElementById('headerLogout').hidden = !useCloud;
+  document.body.classList.toggle('locked', show);
+}
+
+function loginError(msg) {
+  const el = document.getElementById('loginError');
+  if (!msg) { el.hidden = true; return; }
+  el.textContent = msg;
+  el.hidden = false;
+}
+
+const AUTH_MESSAGES = {
+  'auth/invalid-email': 'صيغة البريد الإلكتروني غير صحيحة',
+  'auth/user-not-found': 'ما في حساب بهذا البريد',
+  'auth/wrong-password': 'كلمة السر غير صحيحة',
+  'auth/invalid-credential': 'البريد أو كلمة السر غير صحيحة',
+  'auth/too-many-requests': 'محاولات كثيرة — جرّب بعد شوي',
+  'auth/network-request-failed': 'ما في اتصال بالإنترنت',
+  'auth/user-disabled': 'هذا الحساب موقوف',
+};
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  const btn = document.getElementById('loginBtn');
+  loginError('');
+  if (!email || !pass) { loginError('املأ البريد وكلمة السر'); return; }
+
+  btn.disabled = true; btn.textContent = 'جارٍ الدخول…';
+  try {
+    await auth.signInWithEmailAndPassword(email, pass);
+    // onAuthStateChanged يتكفّل بفتح التطبيق
+  } catch (e) {
+    loginError(AUTH_MESSAGES[e.code] || ('تعذّر الدخول: ' + (e.message || e.code)));
+  } finally {
+    btn.disabled = false; btn.textContent = 'تسجيل الدخول';
+  }
+}
+window.doLogin = doLogin;
+
+async function doLogout() {
+  if (!auth) return;
+  if (!confirm('تسجيل الخروج من التطبيق؟')) return;
+  try { await auth.signOut(); } catch (e) { toast('تعذّر الخروج', 'err'); }
+}
+window.doLogout = doLogout;
 
 /* ===== تخزين محلي (نسخة احتياطية بدون سحابة) ===== */
 function loadLocal() {
@@ -84,6 +139,7 @@ async function addDraft(data) {
   data.createdAt = useCloud
     ? firebase.firestore.FieldValue.serverTimestamp()
     : Date.now();
+  if (useCloud && auth?.currentUser) data.createdBy = auth.currentUser.email || '';
   if (useCloud) {
     await db.collection(window.DRAFTS_COLLECTION || 'drafts').add(data);
   } else {
@@ -107,6 +163,7 @@ const ICON_CLOSE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 const ICON_CLOCK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>`;
 const ICON_CHECK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
 const ICON_PIN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.1-7-11.5A7 7 0 0 1 19 9.5C19 14.9 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg>`;
+const ICON_USER = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.6 3.1-5.5 7-5.5s7 1.9 7 5.5"/></svg>`;
 const ICON_PHONE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 4.5h3.4l1.6 4-2 1.4a12 12 0 0 0 6.6 6.6l1.4-2 4 1.6v3.4a1.5 1.5 0 0 1-1.6 1.5C10.6 20.4 3.6 13.4 3 6.1A1.5 1.5 0 0 1 4.5 4.5z"/></svg>`;
 const ICON_TAG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12.5l-7.5 7.5a1.5 1.5 0 0 1-2.1 0L4 13.6V4h9.6l6.4 6.4a1.5 1.5 0 0 1 0 2.1z"/><circle cx="8.3" cy="8.3" r="1.3"/></svg>`;
 const CAT_ICONS = {
@@ -168,9 +225,11 @@ function buildFieldsHTML(catId) {
 
   if (!isFreeAd(catId)) {
     h += fNum('fPrice', `السعر بالدولار $ *${isRent(catId) ? ' (لليوم)' : ''}`, '0');
+    h += fText('fClientName', 'اسم العميل *', 'مثال: أبو محمد');
     h += fg('رقم صاحب العقار (واتساب) *', `<input type="tel" class="form-input" id="fPhone" placeholder="9XXXXXXXX" inputmode="numeric" dir="ltr" oninput="this.value=this.value.replace(/[^0-9]/g,'')">`);
   } else {
-    h += fg('رقم التواصل (واتساب) *', `<input type="tel" class="form-input" id="fPhone" placeholder="9XXXXXXXX" inputmode="numeric" dir="ltr" oninput="this.value=this.value.replace(/[^0-9]/g,'')">`, true);
+    h += fText('fClientName', 'اسم العميل *', 'مثال: أبو محمد');
+    h += fg('رقم التواصل (واتساب) *', `<input type="tel" class="form-input" id="fPhone" placeholder="9XXXXXXXX" inputmode="numeric" dir="ltr" oninput="this.value=this.value.replace(/[^0-9]/g,'')">`);
   }
   h += `</div></div>`;
 
@@ -324,6 +383,7 @@ function collectFormData() {
     title: val('fTitle'),
     city: val('fCity'),
     neighborhood: val('fNeighborhood'),
+    clientName: val('fClientName'),
     phone: val('fPhone'),
     desc: val('fDesc'),
     images: images.filter(Boolean),
@@ -366,6 +426,7 @@ function collectFormData() {
 function validate(data) {
   if (!data.title) return 'عنوان الإعلان مطلوب';
   if (!data.city) return 'المدينة مطلوبة';
+  if (!data.clientName) return 'اسم العميل مطلوب';
   if (!data.phone || data.phone.length < 8) return 'رقم التواصل غير صحيح';
   if (!isFreeAd(data.catId) && (!data.price || Number(data.price) < 0)) return 'السعر مطلوب';
   if (isCar(data.catId) && !data.carModel) return 'الموديل مطلوب';
@@ -432,6 +493,7 @@ window.showPending = showPending;
 /* ===== عرض قائمة المعلقات ===== */
 function pcardMeta(d) {
   const bits = [];
+  if (d.clientName) bits.push(`<span>${ICON_USER}${esc(d.clientName)}</span>`);
   if (d.city) bits.push(`<span>${ICON_PIN}${esc(d.city)}${d.neighborhood ? ' — ' + esc(d.neighborhood) : ''}</span>`);
   if (isCar(d.catId) && (d.carType || d.carModel)) bits.push(`<span>${esc(d.carType || '')} ${esc(d.carModel || '')}</span>`);
   if (isApt(d.catId) && d.rooms) bits.push(`<span>${d.rooms} غرف</span>`);
@@ -482,13 +544,14 @@ async function refreshPending() {
 
 /* ===== تفاصيل مسودة ===== */
 const DETAIL_LABELS = {
-  price: 'السعر $', city: 'المدينة', neighborhood: 'الحي', phone: 'رقم التواصل', desc: 'الوصف',
+  clientName: 'اسم العميل', price: 'السعر $', city: 'المدينة', neighborhood: 'الحي', phone: 'رقم التواصل', desc: 'الوصف',
   rooms: 'غرف النوم', baths: 'الحمامات', area: 'المساحة م²', aptFloor: 'الطابق', aptFurnished: 'الفرش', aptHeating: 'التدفئة', aptView: 'الإطلالة', aptAge: 'عمر البناء',
   carType: 'الماركة', carModel: 'الموديل', carYear: 'سنة الصنع', carKm: 'المسافة كم', carColor: 'اللون', carClass: 'الفئة', carGear: 'ناقل الحركة', carFuel: 'الوقود', carCondition: 'الحالة',
   shopArea: 'المساحة م²', shopFloor: 'الطابق', shopFronts: 'عدد الواجهات', shopUse: 'يصلح لـ', shopFit: 'التجهيز',
   farmType: 'نوع الأرض', farmArea: 'المساحة م²', farmWater: 'المرافق', landOwnership: 'الملكية',
   equipType: 'نوع المعدة', equipBrand: 'الماركة', equipYear: 'سنة الصنع', equipHours: 'ساعات التشغيل', equipCondition: 'الحالة', equipFuel: 'الوقود',
   freeGroup: 'نوع العمل', profession: 'المهنة',
+  createdBy: 'سجّلها الموظف',
 };
 const BOOL_LABELS = {
   aptSolar:'طاقة شمسية', aptElevator:'مصعد', aptGarage:'كراج/موقف', aptWaterTank:'خزان ماء',
@@ -545,7 +608,25 @@ window.confirmDone = confirmDone;
 /* ===== بدء التشغيل ===== */
 document.addEventListener('DOMContentLoaded', () => {
   initFirebase();
-  showPending();
+
+  if (useCloud) {
+    // انتظر Firebase ليقرّر: مسجّل دخول → افتح التطبيق، وإلا → شاشة الدخول
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        showLogin(false);
+        document.getElementById('loginPass').value = '';
+        loginError('');
+        showPending();
+      } else {
+        showLogin(true);
+      }
+    });
+  } else {
+    // وضع محلي: لا حسابات ولا مزامنة — التطبيق يفتح مباشرة
+    showLogin(false);
+    showPending();
+  }
+
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
