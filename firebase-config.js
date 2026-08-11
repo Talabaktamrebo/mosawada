@@ -18,12 +18,12 @@
    ============================================================ */
 
 window.FIREBASE_CONFIG = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: "AIzaSyCcxI8VLdlIiUvcSUhBtSzxNuSL2wontKw",
+  authDomain: "moswadehadmin.firebaseapp.com",
+  projectId: "moswadehadmin",
+  storageBucket: "moswadehadmin.firebasestorage.app",
+  messagingSenderId: "894967617799",
+  appId: "1:894967617799:web:d03fb8aef2d316b79b8da2"
 };
 
 /* اسم مجموعة المسودات داخل Firestore — لا داعي لتغييره */
