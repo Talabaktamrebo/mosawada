@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>مسودة إضافة إعلان — طلبك تم</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=4">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="theme-color" content="#F6921E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="مسودة إعلان">
+</head>
+<body>
+
+<!-- ===== شريط الحالة العلوي ===== -->
+<header class="topbar">
+  <img src="logo.png" alt="" class="topbar-logo">
+  <div class="topbar-titles">
+    <h1 id="topTitle">المعلقات</h1>
+    <span id="topSub" class="topbar-sub">مسودات بانتظار الإضافة</span>
+  </div>
+  <button type="button" class="header-pending-btn" id="headerPendingBtn" onclick="showPending()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 4h6a2 2 0 0 1 2 2v0H7v0a2 2 0 0 1 2-2z"/>
+      <path d="M17 6h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h1"/>
+      <path d="M9 13l2 2 4-4"/>
+    </svg>
+    <span>المعلقات</span>
+    <em id="headerPendingCount" class="header-pending-count" hidden>0</em>
+  </button>
+</header>
+
+<!-- ===== قائمة المعلقات ===== -->
+<main id="viewPending" class="view">
+  <div id="pendingList" class="pending-list"></div>
+  <div id="pendingEmpty" class="empty" hidden>
+    <img src="logo.png" alt="طلبك تم" class="empty-logo">
+  </div>
+</main>
+
+<!-- ===== نموذج الإضافة ===== -->
+<main id="viewForm" class="view" hidden>
+  <form id="draftForm" autocomplete="off" novalidate></form>
+</main>
+
+<!-- ===== تفاصيل المسودة ===== -->
+<main id="viewDetail" class="view" hidden>
+  <div id="detailBody"></div>
+</main>
+
+<!-- ===== النافبار السفلي — زر الإضافة عائم في المنتصف ===== -->
+<nav class="bottomnav" id="bottomNav">
+  <button type="button" class="nav-fab" id="navAdd" onclick="openForm()" aria-label="تسجيل معاينة جديدة">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+  </button>
+</nav>
+
+<!-- ===== شريط أزرار النموذج (يظهر فقط داخل النموذج) ===== -->
+<div class="formbar" id="formBar" hidden>
+  <button type="button" class="btn btn-ghost" onclick="cancelForm()">إلغاء</button>
+  <button type="button" class="btn btn-save" id="btnSave" onclick="saveDraft()">حفظ بالمعلقات</button>
+</div>
+
+<div id="toastWrap" class="toast-wrap"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js?v=1"></script>
+<script src="app.js?v=3"></script>
+</body>
+</html>
