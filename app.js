@@ -27,6 +27,36 @@ const isEquip = id => getCat(id)?.type === 'equipment';
 const isFreeAd= id => getCat(id)?.type === 'freead';
 const isRent  = id => id.endsWith('-rent');
 
+/* ===== الأدوار والشركاء =====
+   manager  : المدير — يدير الحسابات، يشوف كل الفئات
+   employee : موظف الشركة (الوضع الأصلي) — كل الفئات، بلا قيود
+   الباقي   : شركاء خارجيون — كل واحد محصور بفئاته فقط */
+const ROLE_LABELS = {
+  manager: 'مدير',
+  employee: 'موظف الشركة',
+  'car-dealer': 'معرض سيارات',
+  realestate: 'محل عقاري',
+  'equipment-agent': 'وكيل معدات',
+};
+// null = بلا قيود (كل الفئات)
+const ROLE_CATEGORIES = {
+  manager: null,
+  employee: null,
+  'car-dealer': ['car-rent', 'car-sale'],
+  realestate: ['apt-rent', 'apt-sale', 'shop-rent', 'shop-sale', 'farm-rent', 'farm-sale'],
+  'equipment-agent': ['equip-rent', 'equip-sale'],
+};
+function allowedCats() {
+  const allow = myProfile ? ROLE_CATEGORIES[myProfile.role] : null;
+  return allow ? CATS.filter(c => allow.includes(c.id)) : CATS;
+}
+function groupLabelFor(profile) {
+  if (!profile) return 'غير مصنّف';
+  if (profile.businessName) return profile.businessName;
+  if (profile.role === 'employee') return 'فريق المكتب';
+  return ROLE_LABELS[profile.role] || 'غير مصنّف';
+}
+
 const CITIES = ['جبلة', 'اللاذقية', 'أخرى'];
 const NEIGHBORHOODS = ['حي العمارة','حي العزي','حي الدريبة','حي القلعة',
   'حي السوق (المدينة القديمة)','حي الفيض','حي الجبيبات','حي النقعة',
@@ -46,6 +76,9 @@ let drafts = [];             // القائمة المحمّلة حالياً
 let images = [null, null, null, null, null]; // Data URLs للصور الخمس
 let currentCatId = 'apt-rent';
 const LOCAL_KEY = 'tt-drafts-v1';
+const PARTNERS_COLLECTION = 'partners';
+let myProfile = null;        // { role, businessName, email } — صاحب الجلسة الحالية
+let allPartners = [];        // كل الحسابات (يُحمَّل للمدير فقط)
 
 /* ===== تهيئة Firebase (اختياري) ===== */
 let auth = null;
@@ -117,6 +150,47 @@ async function doLogout() {
 }
 window.doLogout = doLogout;
 
+/* ===== ملف الحساب (partners/{uid}) — الدور يحدّد الفئات المسموحة =====
+   أول من يسجّل دخول بالتطبيق (ولا يوجد أي حساب مصنَّف بعد) يصير «مدير»
+   تلقائياً — آمن هنا لأنه لا يوجد تسجيل ذاتي بالتطبيق: فقط من يملك
+   بريداً وكلمة سرّ أعطاهما إياه المدير أصلاً يقدر يدخل من الأساس. */
+async function loadMyProfile(user) {
+  const doc = await db.collection(PARTNERS_COLLECTION).doc(user.uid).get();
+  if (doc.exists) { myProfile = { uid: user.uid, ...doc.data() }; return myProfile; }
+
+  const anyDoc = await db.collection(PARTNERS_COLLECTION).limit(1).get();
+  if (anyDoc.empty) {
+    const bootstrap = { role: 'manager', businessName: '', email: user.email || '', createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+    await db.collection(PARTNERS_COLLECTION).doc(user.uid).set(bootstrap);
+    myProfile = { uid: user.uid, ...bootstrap };
+    return myProfile;
+  }
+  myProfile = null;
+  return null;
+}
+
+/* إنشاء حساب جديد (موظف/شريك) من داخل التطبيق دون طرد المدير من جلسته:
+   نستخدم نسخة Firebase ثانوية مؤقتة لإنشاء المستخدم، ثم نتخلّص منها فوراً —
+   جلسة المدير على النسخة الأساسية تبقى بلا أي تأثير طوال الوقت. */
+async function createPartnerAccount({ email, password, role, businessName }) {
+  const cfg = window.FIREBASE_CONFIG;
+  const secondaryName = 'Secondary-' + Date.now();
+  const secondaryApp = firebase.initializeApp(cfg, secondaryName);
+  try {
+    const cred = await secondaryApp.auth().createUserWithEmailAndPassword(email, password);
+    const newUid = cred.user.uid;
+    await db.collection(PARTNERS_COLLECTION).doc(newUid).set({
+      role, businessName: businessName || '', email,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      createdBy: auth.currentUser ? auth.currentUser.uid : null,
+    });
+    return newUid;
+  } finally {
+    try { await secondaryApp.auth().signOut(); } catch (e) {}
+    try { await secondaryApp.delete(); } catch (e) {}
+  }
+}
+
 /* ===== تخزين محلي (نسخة احتياطية بدون سحابة) ===== */
 function loadLocal() {
   try { return JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]'); }
@@ -140,7 +214,12 @@ async function addDraft(data) {
   data.createdAt = useCloud
     ? firebase.firestore.FieldValue.serverTimestamp()
     : Date.now();
-  if (useCloud && auth?.currentUser) data.createdBy = auth.currentUser.email || '';
+  if (useCloud && auth?.currentUser) {
+    data.createdBy = auth.currentUser.email || '';
+    data.submittedByUid = auth.currentUser.uid;
+    data.submittedByGroup = groupLabelFor(myProfile);
+    data.submittedByRole = myProfile ? myProfile.role : '';
+  }
   if (useCloud) {
     await db.collection(window.DRAFTS_COLLECTION || 'drafts').add(data);
   } else {
@@ -220,7 +299,7 @@ function buildFieldsHTML(catId) {
   /* القسم 1: معلومات أساسية */
   h += `<div class="fsec"><div class="fsec-title">معلومات الإعلان</div><div class="fsec-grid">`;
   h += fText('fTitle', 'عنوان الإعلان *', 'مثال: شقة مفروشة للإيجار في حي القلعة', true);
-  h += fg('الفئة *', `<select class="form-select" id="fCatId" onchange="onCatChange()">${CATS.map(c => `<option value="${c.id}" ${c.id === catId ? 'selected' : ''}>${c.label}</option>`).join('')}</select>`);
+  h += fg('الفئة *', `<select class="form-select" id="fCatId" onchange="onCatChange()">${allowedCats().map(c => `<option value="${c.id}" ${c.id === catId ? 'selected' : ''}>${c.label}</option>`).join('')}</select>`);
   h += fg('المدينة *', `<select class="form-select" id="fCity">${CITIES.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select>`);
   h += fg('الحي / المنطقة', `<select class="form-select" id="fNeighborhood"><option value="">-- اختياري --</option>${NEIGHBORHOODS.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select>`, true);
 
@@ -459,13 +538,13 @@ window.saveDraft = saveDraft;
 
 /* ===== التنقّل بين الشاشات ===== */
 function showView(id) {
-  ['viewPending', 'viewForm', 'viewDetail'].forEach(v => {
+  ['viewPending', 'viewForm', 'viewDetail', 'viewAdmin'].forEach(v => {
     document.getElementById(v).hidden = (v !== id);
   });
 }
 
 function openForm() {
-  currentCatId = 'apt-rent';
+  currentCatId = allowedCats()[0]?.id || 'apt-rent';
   images = [null, null, null, null, null];
   renderForm(false);
   document.getElementById('topTitle').textContent = 'تسجيل معاينة';
@@ -521,26 +600,53 @@ async function refreshPending() {
     empty.hidden = true;
     const n = drafts.length > 99 ? '99+' : drafts.length;
     headerCount.hidden = false; headerCount.textContent = n;
-    list.innerHTML = drafts.map(d => {
-      const thumb = d.images && d.images[0]
-        ? `<img src="${d.images[0]}">`
-        : `<span class="pcard-thumb-ph">${CAT_ICONS[getCat(d.catId)?.type] || ICON_IMAGE}</span>`;
-      return `
-      <div class="pcard">
-        <div class="pcard-thumb" onclick="openDetail('${d.id}')">${thumb}</div>
-        <div class="pcard-body" onclick="openDetail('${d.id}')">
-          <div class="pcard-top">
-            <span class="pcard-cat">${CAT_ICONS[getCat(d.catId)?.type] || ''}${esc(d.catLabel || '')}</span>
-            ${d.price ? `<span class="pcard-price">$${fmtNum(d.price)}</span>` : ''}
-          </div>
-          <div class="pcard-title">${esc(d.title || 'بدون عنوان')}</div>
-          <div class="pcard-meta">${pcardMeta(d)}</div>
-          <div class="pcard-time">${ICON_CLOCK}${fmtDate(d.createdAt)}</div>
-        </div>
-        <button class="pcard-done" title="تمّت إضافته بالأدمن — حذف" onclick="event.stopPropagation();confirmDone('${d.id}')">${ICON_CHECK}</button>
-      </div>`;
-    }).join('');
+    list.innerHTML = renderGroupedPending(drafts);
   }
+}
+
+function pcardHTML(d) {
+  const thumb = d.images && d.images[0]
+    ? `<img src="${d.images[0]}">`
+    : `<span class="pcard-thumb-ph">${CAT_ICONS[getCat(d.catId)?.type] || ICON_IMAGE}</span>`;
+  return `
+  <div class="pcard">
+    <div class="pcard-thumb" onclick="openDetail('${d.id}')">${thumb}</div>
+    <div class="pcard-body" onclick="openDetail('${d.id}')">
+      <div class="pcard-top">
+        <span class="pcard-cat">${CAT_ICONS[getCat(d.catId)?.type] || ''}${esc(d.catLabel || '')}</span>
+        ${d.price ? `<span class="pcard-price">$${fmtNum(d.price)}</span>` : ''}
+      </div>
+      <div class="pcard-title">${esc(d.title || 'بدون عنوان')}</div>
+      <div class="pcard-meta">${pcardMeta(d)}</div>
+      <div class="pcard-time">${ICON_CLOCK}${fmtDate(d.createdAt)}</div>
+    </div>
+    <button class="pcard-done" title="تمّت إضافته بالأدمن — حذف" onclick="event.stopPropagation();confirmDone('${d.id}')">${ICON_CHECK}</button>
+  </div>`;
+}
+
+/* تقسيم المعلقات لأقسام قابلة للطي حسب الشريك/الجهة — مسودات بلا وسم
+   (مسجّلة قبل هذا التحديث، أو بالوضع المحلي بلا حسابات) تجمّع بقسم واحد
+   بلا عنوان خاص فتبقى مرئية دون أن تُفقَد. */
+function renderGroupedPending(list) {
+  const groups = new Map();
+  list.forEach(d => {
+    const key = d.submittedByGroup || '';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(d);
+  });
+  const ungrouped = groups.get('') || [];
+  const named = [...groups.entries()].filter(([k]) => k !== '');
+
+  let html = named.map(([name, items]) => `
+    <details class="pgroup" open>
+      <summary class="pgroup-head">
+        <span class="pgroup-name">${ICON_USER}${esc(name)}</span>
+        <em class="pgroup-count">${items.length}</em>
+      </summary>
+      <div class="pgroup-body">${items.map(pcardHTML).join('')}</div>
+    </details>`).join('');
+  if (ungrouped.length) html += `<div class="pgroup-body">${ungrouped.map(pcardHTML).join('')}</div>`;
+  return html;
 }
 
 /* ===== تفاصيل مسودة ===== */
@@ -606,21 +712,123 @@ async function confirmDone(id) {
 }
 window.confirmDone = confirmDone;
 
+/* ===== لوحة إدارة الحسابات (المدير فقط) ===== */
+function genPassword() {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  let p = '';
+  for (let i = 0; i < 8; i++) p += chars[Math.floor(Math.random() * chars.length)];
+  return p;
+}
+
+async function openAdminPanel() {
+  if (!myProfile || myProfile.role !== 'manager') return;
+  document.getElementById('topTitle').textContent = 'إدارة الحسابات';
+  document.getElementById('topSub').textContent = 'إنشاء ومتابعة حسابات الموظفين والشركاء';
+  showView('viewAdmin');
+  renderNewPartnerForm();
+  await loadAllPartners();
+}
+window.openAdminPanel = openAdminPanel;
+
+async function loadAllPartners() {
+  const wrap = document.getElementById('partnerList');
+  wrap.innerHTML = '<p class="admin-hint">جارٍ التحميل…</p>';
+  try {
+    const snap = await db.collection(PARTNERS_COLLECTION).orderBy('createdAt', 'desc').get();
+    allPartners = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+  } catch (e) {
+    wrap.innerHTML = '<p class="admin-hint">تعذّر تحميل الحسابات</p>';
+    return;
+  }
+  if (!allPartners.length) { wrap.innerHTML = '<p class="admin-hint">ما في حسابات بعد</p>'; return; }
+  wrap.innerHTML = allPartners.map(p => `
+    <div class="partner-row">
+      <div class="partner-row-main">
+        <span class="partner-row-name">${esc(p.businessName || ROLE_LABELS[p.role] || p.role)}</span>
+        <span class="partner-row-role">${esc(ROLE_LABELS[p.role] || p.role)}</span>
+      </div>
+      <div class="partner-row-email">${esc(p.email || '')}</div>
+    </div>`).join('');
+}
+
+function renderNewPartnerForm() {
+  const wrap = document.getElementById('newPartnerForm');
+  wrap.innerHTML = `
+    <div class="form-group"><label class="form-label">الدور *</label>
+      <select class="form-select" id="npRole" onchange="onNewPartnerRoleChange()">
+        <option value="employee">موظف بالشركة</option>
+        <option value="car-dealer">معرض سيارات</option>
+        <option value="realestate">محل عقاري</option>
+        <option value="equipment-agent">وكيل معدات</option>
+      </select>
+    </div>
+    <div class="form-group" id="npBizWrap" hidden><label class="form-label">اسم المعرض/المحل *</label>
+      <input type="text" class="form-input" id="npBiz" placeholder="مثال: معرض عزام">
+    </div>
+    <div class="form-group"><label class="form-label">البريد الإلكتروني *</label>
+      <input type="email" class="form-input" id="npEmail" placeholder="name@example.com" dir="ltr">
+    </div>
+    <div class="form-group"><label class="form-label">كلمة السر *</label>
+      <div class="np-pass-row">
+        <input type="text" class="form-input" id="npPass" value="${genPassword()}" dir="ltr">
+        <button type="button" class="btn btn-ghost np-gen" onclick="document.getElementById('npPass').value=genPassword()">تجديد</button>
+      </div>
+    </div>
+    <button type="button" class="btn btn-save btn-block" id="npSubmit" onclick="submitNewPartner()">إنشاء الحساب</button>`;
+}
+window.onNewPartnerRoleChange = function () {
+  const role = document.getElementById('npRole').value;
+  document.getElementById('npBizWrap').hidden = (role === 'employee');
+};
+
+async function submitNewPartner() {
+  const role = document.getElementById('npRole').value;
+  const biz = document.getElementById('npBiz')?.value.trim() || '';
+  const email = document.getElementById('npEmail').value.trim().toLowerCase();
+  const pass = document.getElementById('npPass').value;
+  if (!email || !pass) { toast('املأ البريد وكلمة السر', 'err'); return; }
+  if (role !== 'employee' && !biz) { toast('اسم المعرض/المحل مطلوب لهذا الدور', 'err'); return; }
+
+  const btn = document.getElementById('npSubmit');
+  btn.disabled = true; btn.textContent = 'جارٍ الإنشاء…';
+  try {
+    await createPartnerAccount({ email, password: pass, role, businessName: biz });
+    toast('تم إنشاء الحساب — سلّم البيانات لصاحبه', 'ok');
+    renderNewPartnerForm();
+    await loadAllPartners();
+  } catch (e) {
+    const msg = e.code === 'auth/email-already-in-use' ? 'هذا البريد مستخدم لحساب آخر أصلاً'
+      : e.code === 'auth/weak-password' ? 'كلمة السر ضعيفة — 6 أحرف على الأقل'
+      : 'تعذّر الإنشاء: ' + (e.message || e.code);
+    toast(msg, 'err');
+    btn.disabled = false; btn.textContent = 'إنشاء الحساب';
+  }
+}
+window.submitNewPartner = submitNewPartner;
+
 /* ===== بدء التشغيل ===== */
 document.addEventListener('DOMContentLoaded', () => {
   initFirebase();
 
   if (useCloud) {
-    // انتظر Firebase ليقرّر: مسجّل دخول → افتح التطبيق، وإلا → شاشة الدخول
-    auth.onAuthStateChanged(user => {
-      if (user) {
-        showLogin(false);
-        document.getElementById('loginPass').value = '';
-        loginError('');
-        showPending();
-      } else {
-        showLogin(true);
+    // انتظر Firebase ليقرّر: مسجّل دخول → حمّل ملف الحساب ثم افتح التطبيق، وإلا → شاشة الدخول
+    auth.onAuthStateChanged(async user => {
+      if (!user) { myProfile = null; showLogin(true); return; }
+      showLogin(false);
+      document.getElementById('loginPass').value = '';
+      loginError('');
+      try {
+        await loadMyProfile(user);
+      } catch (e) {
+        console.error(e); myProfile = null;
       }
+      const adminBtn = document.getElementById('headerAdminBtn');
+      if (adminBtn) adminBtn.hidden = !myProfile || myProfile.role !== 'manager';
+      if (!myProfile) {
+        toast('حسابك غير مُهيّأ بعد — راجع المدير', 'err');
+        return;
+      }
+      showPending();
     });
   } else {
     // وضع محلي: لا حسابات ولا مزامنة — التطبيق يفتح مباشرة

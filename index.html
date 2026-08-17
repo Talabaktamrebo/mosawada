@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>مسودة إضافة إعلان — طلبك تم</title>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=5">
+<link rel="stylesheet" href="styles.css?v=6">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#F6921E">
@@ -67,6 +67,12 @@
     <span>المعلقات</span>
     <em id="headerPendingCount" class="header-pending-count" hidden>0</em>
   </button>
+  <button type="button" class="header-admin-btn" id="headerAdminBtn" onclick="openAdminPanel()" aria-label="إدارة الحسابات" title="إدارة الحسابات" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c0-3.4 2.9-5.2 5.5-5.2s5.5 1.8 5.5 5.2"/>
+      <path d="M16.5 8.5a2.6 2.6 0 1 1 0-5.2 2.6 2.6 0 0 1 0 5.2z"/><path d="M14.8 14.8c2.3.3 4.7 1.9 4.7 5.2"/>
+    </svg>
+  </button>
   <button type="button" class="header-logout" id="headerLogout" onclick="doLogout()" aria-label="تسجيل الخروج" title="تسجيل الخروج" hidden>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
@@ -92,6 +98,19 @@
   <div id="detailBody"></div>
 </main>
 
+<!-- ===== إدارة الحسابات (المدير فقط) ===== -->
+<main id="viewAdmin" class="view" hidden>
+  <div class="fsec">
+    <div class="fsec-title">حساب جديد</div>
+    <div id="newPartnerForm" class="fsec-grid" style="grid-template-columns:1fr"></div>
+  </div>
+  <div class="fsec">
+    <div class="fsec-title">الحسابات الحالية</div>
+    <div id="partnerList" class="partner-list"></div>
+  </div>
+  <button type="button" class="btn btn-ghost btn-block" onclick="showPending()" style="margin-top:6px">رجوع للمعلقات</button>
+</main>
+
 <!-- ===== النافبار السفلي — زر الإضافة عائم في المنتصف ===== -->
 <nav class="bottomnav" id="bottomNav">
   <button type="button" class="nav-fab" id="navAdd" onclick="openForm()" aria-label="تسجيل معاينة جديدة">
@@ -113,6 +132,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js?v=2"></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>

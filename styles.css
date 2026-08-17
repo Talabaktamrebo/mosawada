@@ -129,6 +129,17 @@ body.locked{overflow:hidden}
   line-height:17px;text-align:center;border:2px solid var(--primary);
 }
 
+/* زر إدارة الحسابات (المدير فقط) */
+.header-admin-btn{
+  flex:none;width:34px;height:34px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.18);color:#fff;
+  border:1px solid rgba(255,255,255,.3);transition:background .15s,transform .1s;
+}
+.header-admin-btn[hidden]{display:none}
+.header-admin-btn:active{transform:scale(.92);background:rgba(255,255,255,.3)}
+.header-admin-btn svg{width:17px;height:17px}
+
 /* زر تسجيل الخروج */
 .header-logout{
   flex:none;width:34px;height:34px;border-radius:50%;
@@ -187,6 +198,44 @@ body.locked{overflow:hidden}
 }
 .pcard-done:active{background:var(--green);color:#fff}
 .pcard-done svg{width:24px;height:24px}
+
+/* ===== أقسام المعلقات حسب الشريك ===== */
+.pgroup{margin-bottom:16px}
+.pgroup-head{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:11px 14px;background:var(--card);border:1px solid var(--border);border-radius:14px;
+  cursor:pointer;list-style:none;user-select:none;margin-bottom:10px;
+}
+.pgroup-head::-webkit-details-marker{display:none}
+.pgroup-name{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:800;color:var(--s800)}
+.pgroup-name svg{width:16px;height:16px;color:var(--primary);flex:none}
+.pgroup-count{
+  min-width:22px;height:22px;padding:0 7px;border-radius:999px;font-style:normal;
+  background:var(--primary-lt);color:var(--primary-dk);font-size:12px;font-weight:900;
+  display:flex;align-items:center;justify-content:center;
+}
+.pgroup-body{display:flex;flex-direction:column;gap:12px}
+.pgroup[open] .pgroup-head{border-bottom-right-radius:0;border-bottom-left-radius:0;margin-bottom:0;border-bottom:none}
+.pgroup[open] .pgroup-body{
+  border:1px solid var(--border);border-top:none;border-radius:0 0 14px 14px;
+  padding:12px;background:var(--s50);
+}
+
+/* ===== لوحة إدارة الحسابات ===== */
+.admin-hint{padding:14px 16px;font-size:13px;color:var(--s500);text-align:center}
+.np-pass-row{display:flex;gap:8px}
+.np-pass-row .form-input{flex:1}
+.np-gen{flex:none;padding:11px 16px;min-height:46px}
+.partner-list{display:flex;flex-direction:column}
+.partner-row{padding:13px 16px;border-bottom:1px solid var(--s100)}
+.partner-row:last-child{border-bottom:none}
+.partner-row-main{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.partner-row-name{font-size:14px;font-weight:800;color:var(--s900)}
+.partner-row-role{
+  font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:999px;
+  background:var(--purple-lt);color:var(--purple);white-space:nowrap;
+}
+.partner-row-email{font-size:12px;color:var(--s500);margin-top:3px;direction:ltr;text-align:right;unicode-bidi:plaintext}
 
 /* ===== التفاصيل ===== */
 .detail-head{
