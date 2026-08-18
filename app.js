@@ -376,7 +376,7 @@ function buildFieldsHTML(catId) {
   for (let i = 0; i < 5; i++) {
     imgSlots += `<div class="img-slot" id="imgSlot${i}" onclick="document.getElementById('imgInput${i}').click()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-      <input type="file" id="imgInput${i}" accept="image/*" capture="environment" style="display:none" onchange="handleImg(${i}, this)">
+      <input type="file" id="imgInput${i}" accept="image/*" style="display:none" onchange="handleImg(${i}, this)">
     </div>`;
   }
   s3 += fg('صور المعاينة (حتى 5 صور)', `<div class="img-grid">${imgSlots}</div>`, true);
@@ -436,7 +436,7 @@ function handleImg(idx, input) {
     images[idx] = reader.result;
     slot.classList.add('filled');
     slot.innerHTML = `<img src="${reader.result}"><span class="img-x" onclick="event.stopPropagation();removeImg(${idx})">${ICON_CLOSE}</span>
-      <input type="file" id="imgInput${idx}" accept="image/*" capture="environment" style="display:none" onchange="handleImg(${idx}, this)">`;
+      <input type="file" id="imgInput${idx}" accept="image/*" style="display:none" onchange="handleImg(${idx}, this)">`;
   };
   reader.onerror = () => toast('تعذّر قراءة الصورة', 'err');
   reader.readAsDataURL(file);
@@ -447,7 +447,7 @@ function removeImg(idx) {
   const slot = document.getElementById(`imgSlot${idx}`);
   slot.classList.remove('filled');
   slot.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    <input type="file" id="imgInput${idx}" accept="image/*" capture="environment" style="display:none" onchange="handleImg(${idx}, this)">`;
+    <input type="file" id="imgInput${idx}" accept="image/*" style="display:none" onchange="handleImg(${idx}, this)">`;
 }
 window.removeImg = removeImg;
 
