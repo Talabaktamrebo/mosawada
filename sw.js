@@ -1,6 +1,6 @@
-const CACHE_NAME = 'tt-draft-v9';
+const CACHE_NAME = 'tt-draft-v10';
 const STATIC_ASSETS = [
-  './', './index.html', './styles.css', './app.js', './firebase-config.js',
+  './', './index.html', './styles.css', './app.js', './firebase-config.js', './supabase-config.js',
   './manifest.json', './icon-192.png', './icon-512.png'
 ];
 
@@ -22,7 +22,7 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-  if (url.origin !== location.origin) return; // اترك طلبات Firebase تمرّ مباشرة
+  if (url.origin !== location.origin) return; // اترك طلبات Firebase/Supabase تمرّ مباشرة
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
       const copy = res.clone();

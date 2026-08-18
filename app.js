@@ -425,21 +425,47 @@ function renderForm(keepCommon) {
   if (isFreeAd(currentCatId)) onFreeGroupChange();
 }
 
-/* ===== الصور: تحويل لـ Data URL محلياً (بدون رفع خارجي) ===== */
-function handleImg(idx, input) {
+/* ===== الصور: رفع حقيقي لـ Supabase Storage (bucket منفصل «drafts») =====
+   قبل التعديل كانت الصورة تُحوَّل base64 وتُخزَّن مباشرة جوّا مستند
+   Firestore — أي صورة كاميرا حقيقية (2-5 م.ب) كانت تتخطى حد المستند
+   الأقصى (1 م.ب)، وهذا بالضبط سبب فشل الحفظ أحياناً بلا سبب واضح.
+   الآن يُرفَع الملف الفعلي لمخزن ملفات، ويُحفَظ رابط قصير بس بـ Firestore. */
+let supabaseStorageClient = null;
+function initSupabaseStorage() {
+  const cfg = window.SUPABASE_CONFIG || {};
+  if (!cfg.url || !cfg.anonKey || typeof supabase === 'undefined') return;
+  try { supabaseStorageClient = supabase.createClient(cfg.url, cfg.anonKey); }
+  catch (e) { console.warn('Supabase Storage init failed', e); }
+}
+
+async function handleImg(idx, input) {
   const file = input.files[0];
   if (!file) return;
   const slot = document.getElementById(`imgSlot${idx}`);
-  slot.innerHTML = `<span class="busy">جارٍ التحميل…</span>`;
-  const reader = new FileReader();
-  reader.onload = () => {
-    images[idx] = reader.result;
+
+  if (!supabaseStorageClient) {
+    toast('رفع الصور غير مُفعَّل — راجع ملف supabase-config.js', 'err');
+    return;
+  }
+
+  slot.innerHTML = `<span class="busy">جارٍ الرفع…</span>`;
+  try {
+    const ext = ((file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '')) || 'jpg';
+    const path = Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.' + ext;
+    const bucket = window.DRAFTS_BUCKET || 'drafts';
+    const up = await supabaseStorageClient.storage.from(bucket).upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type || undefined });
+    if (up.error) throw up.error;
+    const url = supabaseStorageClient.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+
+    images[idx] = url;
     slot.classList.add('filled');
-    slot.innerHTML = `<img src="${reader.result}"><span class="img-x" onclick="event.stopPropagation();removeImg(${idx})">${ICON_CLOSE}</span>
+    slot.innerHTML = `<img src="${url}"><span class="img-x" onclick="event.stopPropagation();removeImg(${idx})">${ICON_CLOSE}</span>
       <input type="file" id="imgInput${idx}" accept="image/*" style="display:none" onchange="handleImg(${idx}, this)">`;
-  };
-  reader.onerror = () => toast('تعذّر قراءة الصورة', 'err');
-  reader.readAsDataURL(file);
+  } catch (e) {
+    console.error(e);
+    toast('تعذّر رفع الصورة: ' + (e.message || e), 'err');
+    removeImg(idx);
+  }
 }
 window.handleImg = handleImg;
 function removeImg(idx) {
@@ -809,6 +835,7 @@ window.submitNewPartner = submitNewPartner;
 /* ===== بدء التشغيل ===== */
 document.addEventListener('DOMContentLoaded', () => {
   initFirebase();
+  initSupabaseStorage();
 
   if (useCloud) {
     // انتظر Firebase ليقرّر: مسجّل دخول → حمّل ملف الحساب ثم افتح التطبيق، وإلا → شاشة الدخول
