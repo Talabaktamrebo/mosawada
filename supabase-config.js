@@ -40,8 +40,8 @@
    ============================================================ */
 
 window.SUPABASE_CONFIG = {
-  url: "",
-  anonKey: "",
+  url: "https://eqtcazviwludzyzmgvtc.supabase.co",
+  anonKey: "sb_publishable_SHLcxq_At3_Dgum1yP8LHA_72x1G-Ad",
 };
 
 /* اسم الـ bucket المخصَّص لصور المسودات — لا داعي لتغييره */
