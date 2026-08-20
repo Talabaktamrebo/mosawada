@@ -68,12 +68,16 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isManager() {
-      return request.auth != null &&
-        get(/databases/$(database)/documents/partners/$(request.auth.uid)).data.role == 'manager';
+    function myRole() {
+      return get(/databases/$(database)/documents/partners/$(request.auth.uid)).data.role;
     }
+    function isManager() { return request.auth != null && myRole() == 'manager'; }
+    function isPrivileged() { return request.auth != null && (myRole() == 'manager' || myRole() == 'employee'); }
+
     match /drafts/{draftId} {
-      allow read, write: if request.auth != null;
+      allow read, update, delete: if request.auth != null &&
+        (isPrivileged() || resource.data.submittedByUid == request.auth.uid);
+      allow create: if request.auth != null;
     }
     match /partners/{uid} {
       allow read: if request.auth != null;
@@ -84,13 +88,19 @@ service cloud.firestore {
 ```
 
 هذا يعني:
-- **`drafts`**: فقط من سجّل دخوله (بأي دور) يقدر يقرأ أو يكتب أو يحذف المسودات.
+- **`drafts`**: المدير والموظف الداخلي يشوفوا/يعدّلوا كل المسودات. **أي شريك خارجي (معرض/محل
+  عقاري/وكيل معدات) ما بيقدر يقرأ ولا يحذف إلا مسوداته هو بس** — حتى لو حاول يتحايل على
+  التطبيق نفسه (فتح devtools مثلاً)، القاعدة السحابية بترفض الطلب. الإنشاء مفتوح للجميع
+  (أي حدا مسجّل دخوله يقدر يضيف مسودة).
 - **`partners`**: أي حساب مسجّل دخوله يقدر **يقرأ** قائمة الحسابات (أسماء/أدوار — لا كلمات سر
   ولا بيانات حسّاسة)، لكن **الكتابة** (إنشاء/تعديل دور) محصورة بصاحب الحساب نفسه أو المدير.
 
-> ملاحظة تقنية: القراءة هون لازم تكون مفتوحة للجميع (لا مقيّدة بشرط لكل مستند) لأن التطبيق
-> يحتاج يفحص "هل يوجد مدير أصلاً؟" (استعلام على كل المجموعة) عند أول تسجيل دخول — وFirestore
-> لا يسمح باستعلام على مجموعة كاملة إن كانت قاعدة القراءة مشروطة بمستند بعينه.
+> ملاحظة تقنية: قراءة `partners` لازم تبقى مفتوحة للجميع (لا مقيّدة بشرط لكل مستند) لأن
+> التطبيق يحتاج يفحص "هل يوجد مدير أصلاً؟" (استعلام على كل المجموعة) عند أول تسجيل دخول —
+> وFirestore لا يسمح باستعلام على مجموعة كاملة إن كانت قاعدة القراءة مشروطة بمستند بعينه.
+> نفس القيد ينطبق على استعلام الشريك لمسوداته: لازم يكون مقيّداً بـ
+> `.where('submittedByUid','==', uid)` من طرف الكود (لا استعلام مفتوح) حتى يقبله Firestore —
+> وهذا بالضبط ما ينفّذه fetchDrafts بـ app.js.
 
 > 🔴 **مهم:** لا تستخدم `if true` بدل `if request.auth != null`. المستودع عام على GitHub،
 > يعني إعدادات Firebase مكشوفة للجميع — ومع `if true` أي شخص بالعالم يقدر يقرأ مسودات

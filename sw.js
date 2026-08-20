@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tt-draft-v11';
+const CACHE_NAME = 'tt-draft-v12';
 const STATIC_ASSETS = [
   './', './index.html', './styles.css', './app.js', './firebase-config.js', './supabase-config.js',
   './manifest.json', './icon-192.png', './icon-512.png'

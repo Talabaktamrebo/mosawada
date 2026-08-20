@@ -201,10 +201,29 @@ function saveLocal(list) {
 }
 
 /* ===== قراءة/كتابة المعلقات ===== */
+// وقت المستند بالمللي ثانية — يقبل serverTimestamp (سحابة) أو رقم (محلي)
+function _draftTime(d) {
+  const t = d.createdAt;
+  if (!t) return 0;
+  if (typeof t === 'number') return t;
+  if (t.toMillis) return t.toMillis();
+  return new Date(t).getTime() || 0;
+}
+
+// الشريك الخارجي (معرض/محل عقاري/وكيل معدات) يشوف مسوداته هو بس؛
+// المدير والموظف الداخلي يشوفوا الكل — نفس منطق allowedCats للفئات.
+function isPrivilegedRole(role) { return role === 'manager' || role === 'employee'; }
+
 async function fetchDrafts() {
   if (useCloud) {
-    const snap = await db.collection(window.DRAFTS_COLLECTION || 'drafts')
-      .orderBy('createdAt', 'desc').get();
+    const col = db.collection(window.DRAFTS_COLLECTION || 'drafts');
+    if (myProfile && !isPrivilegedRole(myProfile.role)) {
+      // بلا orderBy هون عمداً: فهرس مركّب غير مطلوب لفلتر مساواة وحيد،
+      // والترتيب بيصير محلياً بعد الجلب.
+      const snap = await col.where('submittedByUid', '==', myProfile.uid).get();
+      return snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => _draftTime(b) - _draftTime(a));
+    }
+    const snap = await col.orderBy('createdAt', 'desc').get();
     return snap.docs.map(d => ({ id: d.id, ...d.data() }));
   }
   return loadLocal().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
